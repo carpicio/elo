@@ -250,4 +250,59 @@ with tab1:
 
             k1, k2, k3 = st.columns(3)
             with k1: show_smart_card("1", o1, res['EV_1'], "1")
-            with k2: show_smart_card("X", ox, res['EV_X'],
+            with k2: show_smart_card("X", ox, res['EV_X'], "X")
+            with k3: show_smart_card("2", o2, res['EV_2'], "2")
+
+with tab2:
+    st.header("🚀 Occasioni Future (con Ranking)")
+    if df_future is None: st.info("Carica Future.")
+    elif df_history is None: st.warning("Carica Storico.")
+    else:
+        min_roi_target = st.slider("Min ROI Storico %", 0, 50, 10)
+        results = []
+        progress = st.progress(0)
+        
+        for i, row in df_future.iterrows():
+            c_a = row.get('cotaa', 0)
+            c_d = row.get('cotad', 0)
+            
+            # Qui EV è già stato calcolato nel load_data tenendo conto del Ranking!
+            n1, roi1, p1 = analyze_input(df_history, c_a, row.get('EV_1', 0), "1")
+            if n1 >= 5 and roi1 >= min_roi_target and row.get('EV_1', 0) > 0:
+                results.append({'Data': row.get('datamecic', '-'), 'Casa': row.get('txtechipa1', '-'), 'Ospite': row.get('txtechipa2', '-'), 
+                                'Bet': '1', 'Quota': round(c_a, 2), 'EV %': round(row.get('EV_1', 0)*100, 1), 'ROI %': round(roi1, 1), 'Casi': n1})
+            
+            n2, roi2, p2 = analyze_input(df_history, c_d, row.get('EV_2', 0), "2")
+            if n2 >= 5 and roi2 >= min_roi_target and row.get('EV_2', 0) > 0:
+                results.append({'Data': row.get('datamecic', '-'), 'Casa': row.get('txtechipa1', '-'), 'Ospite': row.get('txtechipa2', '-'), 
+                                'Bet': '2', 'Quota': round(c_d, 2), 'EV %': round(row.get('EV_2', 0)*100, 1), 'ROI %': round(roi2, 1), 'Casi': n2})
+            
+            progress.progress((i + 1) / len(df_future))
+        progress.empty()
+        
+        if results:
+            df_res = pd.DataFrame(results).sort_values('ROI %', ascending=False)
+            st.success(f"Trovate **{len(df_res)}** Occasioni!")
+            st.dataframe(df_res)
+        else:
+            st.warning("Nessuna occasione.")
+
+with tab3:
+    st.header("📊 Report")
+    if df_history is not None:
+        df_played = df_history[df_history['res_1x2'] != '-'].copy()
+        if not df_played.empty:
+            pnl_1 = np.where(df_played['EV_1']>0, np.where(df_played['res_1x2']=='1', df_played['cotaa']-1, -1), 0).sum()
+            pnl_2 = np.where(df_played['EV_2']>0, np.where(df_played['res_1x2']=='2', df_played['cotad']-1, -1), 0).sum()
+            
+            k1, k2 = st.columns(2)
+            k1.metric("Profitto 1", f"{pnl_1:.2f} u", delta="Ranking Attivo" if USE_DYN else "Standard")
+            k2.metric("Profitto 2", f"{pnl_2:.2f} u", delta="Ranking Attivo" if USE_DYN else "Standard")
+            
+            st.write("Esempio calcolo HFA Dinamico:")
+            cols_debug = ['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']
+            st.dataframe(df_played[[c for c in cols_debug if c in df_played.columns]].head())
+        else:
+            st.info("Nessun risultato storico.")
+    else:
+        st.info("Carica Storico.")
