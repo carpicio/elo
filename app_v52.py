@@ -44,6 +44,7 @@ def calculate_row(row, base_hfa, use_dynamic):
                 rank_diff = r_a_away - r_h_home
                 adj = rank_diff * 3
                 # --- CARICAMENTO DATI ---
+# --- CARICAMENTO DATI ---
 @st.cache_data(ttl=0)
 def load_data(file, base_hfa, use_dynamic):
     try:
@@ -60,15 +61,14 @@ def load_data(file, base_hfa, use_dynamic):
         # 2. RIMUOVI COLONNE DUPLICATE
         df = df.loc[:, ~df.columns.duplicated()]
         
-        # 3. Mappa nomi (CORRETTA PER IL TUO FILE)
-        # Ho tolto gli spazi da 'place1a', 'place2d', ecc. per combaciare col tuo Excel
+        # 3. Mappa nomi (AGGIORNATA PER IL TUO FILE)
         rename_map = {
             '1': 'cotaa', 'x': 'cotae', '2': 'cotad',
             'eloc': 'elohomeo', 'eloo': 'eloawayo',
             'gfinc': 'scor1', 'gfino': 'scor2',
             'data': 'datamecic', 'datameci': 'datamecic',
             'casa': 'txtechipa1', 'ospite': 'txtechipa2',
-            # QUI ERA L'ERRORE: ora cerchiamo la versione senza spazi
+            # QUI LA CORREZIONE: Aggiunte le versioni senza spazi
             'place1a': 'rank_h_home', 'place 1a': 'rank_h_home',
             'place2d': 'rank_a_away', 'place 2d': 'rank_a_away',
             'place1t': 'rank_h_tot',  'place 1t': 'rank_h_tot',
@@ -113,6 +113,8 @@ def load_data(file, base_hfa, use_dynamic):
             df.loc[mask & (df['scor1'] < df['scor2']), 'res_1x2'] = '2'
             
         return df, None
+    except Exception as e:
+        return None, f"Errore nel caricamento: {str(e)}"
     except Exception as e:
         return None, f"Errore nel caricamento: {str(e)}"
         # Rimuovi duplicati di nuovo dopo rinomina
