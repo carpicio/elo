@@ -189,7 +189,7 @@ df = df.loc[:, ~df.columns.duplicated()]
 # 3. Mostra la tabella
 st.dataframe(df[final_cols])
 
-        with tab2:
+with tab2:
             st.header("Impatto Classifica su HFA")
             if has_rank:
                 st.write("Esempio di come il Ranking modifica il fattore campo:")
