@@ -179,4 +179,41 @@ if uploaded_file:
             if not df_played.empty:
                 # Calcolo PnL
                 pnl_1 = np.where(df_played['EV_1']>0, np.where(df_played['res_1x2']=='1', df_played['cotaa']-1, -1), 0).sum()
-                pnl_2 =
+                pnl_2 = np.where(df_played['EV_2']>0, np.where(df_played['res_1x2']=='2', df_played['cotad']-1, -1), 0).sum()
+                
+                k1, k2 = st.columns(2)
+                k1.metric("Profitto Casa (1)", f"{pnl_1:.2f} u")
+                k2.metric("Profitto Ospite (2)", f"{pnl_2:.2f} u")
+                
+                # Tabella Risultati
+                desired_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'cotaa', 'cotad', 'EV_1', 'EV_2', 'res_1x2']
+                # Filtra solo colonne esistenti
+                final_cols = [c for c in desired_cols if c in df_played.columns]
+                
+                # Rimuovi duplicati dalla lista visualizzazione
+                final_cols = list(dict.fromkeys(final_cols))
+                st.dataframe(df_played[final_cols])
+            else:
+                st.info("Nessuna partita con risultato finale trovato nel file.")
+
+        # --- TAB 2: DATI COMPLETI ---
+        with tab2:
+            st.subheader("Dataset Completo")
+            
+            # Mostra dataframe pulito da duplicati
+            st.dataframe(df.loc[:, ~df.columns.duplicated()])
+            
+            st.markdown("---")
+            st.subheader("Verifica Colonne Ranking")
+            
+            # Debug: mostra se sta leggendo i rank
+            cols_rank = ['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']
+            safe_cols = [c for c in cols_rank if c in df.columns]
+            
+            if len(safe_cols) > 0:
+                st.dataframe(df[safe_cols].head(20))
+            else:
+                st.warning("Le colonne del ranking non sono visibili.")
+
+else:
+    st.info("👈 Carica il file CSV per iniziare.")
