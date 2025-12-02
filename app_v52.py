@@ -43,33 +43,7 @@ def calculate_row(row, base_hfa, use_dynamic):
             if pd.notna(r_h_home) and pd.notna(r_a_away):
                 rank_diff = r_a_away - r_h_home
                 adj = rank_diff * 3
-                current_hfa = base_hfa + adj
-                current_hfa = max(0, min(current_hfa, 200)) # Limiti
-        
-        res['HFA_Used'] = current_hfa
-        
-        # Calcolo Probabilità
-        pf_1, pf_x, pf_2 = remove_margin(o1, ox, o2)
-        p_elo_h, p_elo_a = get_implicit_probs(elo_h, elo_a, current_hfa)
-        
-        rem = 1 - pf_x
-        p_fin_1 = rem * p_elo_h
-        p_fin_2 = rem * p_elo_a
-        
-        res['Fair_1'] = 1/p_fin_1 if p_fin_1>0 else 0
-        res['Fair_X'] = 1/pf_x if pf_x>0 else 0
-        res['Fair_2'] = 1/p_fin_2 if p_fin_2>0 else 0
-        res['EV_1'] = (o1 * p_fin_1) - 1
-        res['EV_X'] = (ox * pf_x) - 1
-        res['EV_2'] = (o2 * p_fin_2) - 1
-        res['ELO_Diff'] = (elo_h + current_hfa) - elo_a
-        
-    except:
-        pass
-        
-    return pd.Series(res)
-
-# --- CARICAMENTO DATI ---
+                # --- CARICAMENTO DATI ---
 @st.cache_data(ttl=0)
 def load_data(file, base_hfa, use_dynamic):
     try:
@@ -83,31 +57,64 @@ def load_data(file, base_hfa, use_dynamic):
         # 1. Normalizza nomi e rimuovi spazi
         df.columns = df.columns.str.strip().str.lower()
         
-        # 2. RIMUOVI COLONNE DUPLICATE (CRITICO PER EVITARE ERRORI)
+        # 2. RIMUOVI COLONNE DUPLICATE
         df = df.loc[:, ~df.columns.duplicated()]
         
-        # 3. Mappa nomi (dal tuo Excel al codice)
+        # 3. Mappa nomi (CORRETTA PER IL TUO FILE)
+        # Ho tolto gli spazi da 'place1a', 'place2d', ecc. per combaciare col tuo Excel
         rename_map = {
             '1': 'cotaa', 'x': 'cotae', '2': 'cotad',
             'eloc': 'elohomeo', 'eloo': 'eloawayo',
             'gfinc': 'scor1', 'gfino': 'scor2',
             'data': 'datamecic', 'datameci': 'datamecic',
             'casa': 'txtechipa1', 'ospite': 'txtechipa2',
-            'place 1a': 'rank_h_home', 'place 2d': 'rank_a_away',
-            'place 1t': 'rank_h_tot', 'place 2t': 'rank_a_tot'
+            # QUI ERA L'ERRORE: ora cerchiamo la versione senza spazi
+            'place1a': 'rank_h_home', 'place 1a': 'rank_h_home',
+            'place2d': 'rank_a_away', 'place 2d': 'rank_a_away',
+            'place1t': 'rank_h_tot',  'place 1t': 'rank_h_tot',
+            'place2t': 'rank_a_tot',  'place 2t': 'rank_a_tot'
         }
         
-        # Applica mappa in modo sicuro
+        # Applica mappa
         cols_found = list(df.columns)
         final_rename = {}
         for col in cols_found:
             for key, val in rename_map.items():
-                if key == col or key in col: # Match parziale (es. "place 1a" in "place 1a ")
+                # Controllo se la chiave è contenuta nel nome della colonna
+                if key in col: 
                     final_rename[col] = val
                     break
         
         df = df.rename(columns=final_rename)
         
+        # Rimuovi duplicati post-rinomina
+        df = df.loc[:, ~df.columns.duplicated()]
+
+        # Pulizia Numeri
+        cols_num = ['cotaa', 'cotae', 'cotad', 'elohomeo', 'eloawayo', 'scor1', 'scor2', 'rank_h_home', 'rank_a_away']
+        for c in cols_num:
+            if c in df.columns:
+                df[c] = df[c].astype(str).str.replace(',', '.', regex=False)
+                df[c] = pd.to_numeric(df[c], errors='coerce')
+
+        # Filtra righe valide
+        df = df.dropna(subset=['cotaa', 'cotae', 'cotad', 'elohomeo', 'eloawayo'])
+        
+        # Calcolo
+        calc = df.apply(lambda r: calculate_row(r, base_hfa, use_dynamic), axis=1)
+        df = pd.concat([df, calc], axis=1)
+        
+        # Risultati 1X2
+        df['res_1x2'] = '-' 
+        if 'scor1' in df.columns and 'scor2' in df.columns:
+            mask = df['scor1'].notna() & df['scor2'].notna()
+            df.loc[mask & (df['scor1'] > df['scor2']), 'res_1x2'] = '1'
+            df.loc[mask & (df['scor1'] == df['scor2']), 'res_1x2'] = 'X'
+            df.loc[mask & (df['scor1'] < df['scor2']), 'res_1x2'] = '2'
+            
+        return df, None
+    except Exception as e:
+        return None, f"Errore nel caricamento: {str(e)}"
         # Rimuovi duplicati di nuovo dopo rinomina
         df = df.loc[:, ~df.columns.duplicated()]
 
