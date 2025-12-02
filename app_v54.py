@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # --- CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Value Bet V55", page_icon="🛡️", layout="wide")
-st.title("🛡️ Calcolatore Strategico (Final V55)")
+st.set_page_config(page_title="Value Bet V56", page_icon="🛡️", layout="wide")
+st.title("🛡️ Calcolatore Strategico (Final V56)")
 st.markdown("---")
 
 # --- FUNZIONI MATEMATICHE ---
@@ -29,7 +29,7 @@ def calculate_row(row, base_hfa, use_dynamic):
     res = {'EV_1': -1, 'EV_X': -1, 'EV_2': -1, 'HFA_Used': base_hfa}
     
     try:
-        # Funzione helper per convertire in float in sicurezza
+        # Helper sicuro per numeri
         def get_float(val):
             try:
                 return float(str(val).replace(',', '.'))
@@ -99,10 +99,14 @@ def load_data(file, base_hfa, use_dynamic):
             'data': 'datamecic', 'datameci': 'datamecic',
             'casa': 'txtechipa1', 'ospite': 'txtechipa2',
             # Rank varianti
-            'place1a': 'rank_h_home', 'place 1a': 'rank_h_home',
-            'place2d': 'rank_a_away', 'place 2d': 'rank_a_away',
-            'place1t': 'rank_h_tot',  'place 1t': 'rank_h_tot',
-            'place2t': 'rank_a_tot',  'place 2t': 'rank_a_tot'
+            'place1a': 'rank_h_home',
+            'place 1a': 'rank_h_home',
+            'place2d': 'rank_a_away',
+            'place 2d': 'rank_a_away',
+            'place1t': 'rank_h_tot',
+            'place 1t': 'rank_h_tot',
+            'place2t': 'rank_a_tot',
+            'place 2t': 'rank_a_tot'
         }
         
         cols_found = list(df.columns)
@@ -175,8 +179,28 @@ if uploaded_file:
                 c1.metric("Profitto Casa", f"{pnl_1:.2f} u")
                 c2.metric("Profitto Ospite", f"{pnl_2:.2f} u")
                 
-                # Lista divisa su più righe per evitare errori di copia
+                # LISTA COLONNE BLINDATA (Verticale per evitare errori copia)
                 cols_show = [
-                    'datamecic', 'txtechipa1', 'txtechipa2', 
-                    'HFA_Used', 'cotaa', 'cotad', 
-                    'EV
+                    'datamecic',
+                    'txtechipa1',
+                    'txtechipa2',
+                    'HFA_Used',
+                    'cotaa',
+                    'cotad',
+                    'EV_1',
+                    'EV_2',
+                    'res_1x2'
+                ]
+                
+                # Filtra solo colonne esistenti
+                final_cols = [c for c in cols_show if c in df_played.columns]
+                st.dataframe(df_played[final_cols])
+            else:
+                st.info("Nessun risultato finale disponibile per il calcolo profitto.")
+
+        with tab2:
+            st.dataframe(df)
+    else:
+        st.warning("File letto ma vuoto o colonne mancanti.")
+else:
+    st.info("Carica il file CSV per iniziare.")
