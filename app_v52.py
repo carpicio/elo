@@ -203,7 +203,7 @@ else:  # <--- Riga 179
         except Exception as e:
             st.error(f"Errore: {e}")
 cols_rank = ['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']
-                safe_cols = [c for c in cols_rank if c in df.columns]
-                st.dataframe(df[safe_cols].head(20))
-            else:
-                st.write("Dati ranking non disponibili nel file.")
+safe_cols = [c for c in cols_rank if c in df.columns]
+st.dataframe(df[safe_cols].head(20))
+else:
+            st.write("Dati ranking non disponibili nel file.")
