@@ -177,22 +177,35 @@ if uploaded_file:
                 
                 st.dataframe(df_played[final_cols])
             else:
-                st.info("Nessun risultato storico nel file.")
-                desired_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'EV_1', 'EV_2']
-                final_cols = [c for c in desired_cols if c in df.columns]
-                # 1. Rimuove duplicati dalla LISTA delle colonne richieste
-final_cols = list(dict.fromkeys(final_cols))
+                # --- INIZIO CORREZIONE ---
 
-# 2. Rimuove eventuali colonne duplicate dal DATAFRAME stesso
+# 1. Rimuoviamo colonne duplicate dal DataFrame (elimina le colonne nascoste/doppie di Excel)
 df = df.loc[:, ~df.columns.duplicated()]
 
-# 3. Mostra la tabella
-st.dataframe(df[final_cols])
+# 2. Puliamo la lista delle colonne da visualizzare (toglie duplicati dalla lista)
+# Nota: assicurati che 'final_cols' contenga solo i nomi delle colonne VISIBILI nel tuo Excel
+if 'final_cols' in locals():
+    final_cols = list(dict.fromkeys(final_cols))
+    # Filtriamo: teniamo solo le colonne che esistono davvero nel file excel letto
+    final_cols = [c for c in final_cols if c in df.columns]
 
-with tab2:
-            st.header("Impatto Classifica su HFA")
-            if has_rank:
-                st.write("Esempio di come il Ranking modifica il fattore campo:")
+# 3. Creazione delle tab (Assicurati che questa riga sia allineata a sinistra!)
+tab1, tab2 = st.tabs(["Analisi", "Dati Completi"])  # Esempio, usa i tuoi nomi
+
+with tab1:
+    st.write("Contenuto Tab 1")
+    # ... il tuo codice per tab 1 ...
+
+with tab2:  # <--- IMPORTANTE: Deve essere allineato verticalmente con 'with tab1'
+    try:
+        # Se final_cols è definito usiamo quello, altrimenti tutto il df
+        cols_to_show = final_cols if 'final_cols' in locals() else df.columns
+        st.dataframe(df[cols_to_show])
+    except Exception as e:
+        st.error(f"Errore nella visualizzazione: {e}")
+        st.write("Colonne rilevate:", df.columns.tolist())
+
+# --- FINE CORREZIONE ---
                 cols_rank = ['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']
                 safe_cols = [c for c in cols_rank if c in df.columns]
                 st.dataframe(df[safe_cols].head(20))
