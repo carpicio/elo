@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Value Bet Dynamic HFA v49", page_icon="📈", layout="wide")
-st.title("📈 Calcolatore Strategico (Dynamic HFA v49)")
+st.set_page_config(page_title="Value Bet Dynamic v49.1", page_icon="📈", layout="wide")
+st.title("📈 Calcolatore Strategico (Dynamic HFA Fix)")
 st.markdown("---")
 
 # --- FUNZIONI MATEMATICHE ---
@@ -37,37 +37,33 @@ def calculate_row(row, base_hfa, use_dynamic):
         # --- LOGICA HFA DINAMICO ---
         current_hfa = base_hfa
         if use_dynamic:
-            # Cerchiamo le colonne ranking
             r_h_home = row.get('rank_h_home') # Place 1a
             r_a_away = row.get('rank_a_away') # Place 2d
             
             if pd.notna(r_h_home) and pd.notna(r_a_away):
-                # Se Casa è 1° (1) e Ospite 20° (20) -> Diff = 19 -> HFA aumenta
-                # Se Casa è 20° e Ospite 1° -> Diff = -19 -> HFA diminuisce
                 rank_diff = r_a_away - r_h_home
-                # Moltiplicatore: 3 punti ELO per ogni posizione di differenza
                 adj = rank_diff * 3
                 current_hfa = base_hfa + adj
-                # Limiti di sicurezza (0 - 200)
-                current_hfa = max(0, min(current_hfa, 200))
+                current_hfa = max(0, min(current_hfa, 200)) # Limiti
         
         res['HFA_Used'] = current_hfa
         
         # Calcolo
-        pf_1, pf_x, pf_2 = remove_margin(o1, ox, o2)
-        p_elo_h, p_elo_a = get_implicit_probs(elo_h, elo_a, current_hfa)
-        
-        rem = 1 - pf_x
-        p_fin_1 = rem * p_elo_h
-        p_fin_2 = rem * p_elo_a
-        
-        res['Fair_1'] = 1/p_fin_1 if p_fin_1>0 else 0
-        res['Fair_X'] = 1/pf_x if pf_x>0 else 0
-        res['Fair_2'] = 1/p_fin_2 if p_fin_2>0 else 0
-        res['EV_1'] = (o1 * p_fin_1) - 1
-        res['EV_X'] = (ox * pf_x) - 1
-        res['EV_2'] = (o2 * p_fin_2) - 1
-        res['ELO_Diff'] = (elo_h + current_hfa) - elo_a
+        if o1 > 0 and ox > 0 and o2 > 0:
+            pf_1, pf_x, pf_2 = remove_margin(o1, ox, o2)
+            p_elo_h, p_elo_a = get_implicit_probs(elo_h, elo_a, current_hfa)
+            
+            rem = 1 - pf_x
+            p_fin_1 = rem * p_elo_h
+            p_fin_2 = rem * p_elo_a
+            
+            res['Fair_1'] = 1/p_fin_1 if p_fin_1>0 else 0
+            res['Fair_X'] = 1/pf_x if pf_x>0 else 0
+            res['Fair_2'] = 1/p_fin_2 if p_fin_2>0 else 0
+            res['EV_1'] = (o1 * p_fin_1) - 1
+            res['EV_X'] = (ox * pf_x) - 1
+            res['EV_2'] = (o2 * p_fin_2) - 1
+            res['ELO_Diff'] = (elo_h + current_hfa) - elo_a
         
     except:
         pass
@@ -86,23 +82,28 @@ def load_data(file, base_hfa, use_dynamic):
             df = pd.read_csv(file, sep=',', encoding='latin1')
 
         df.columns = df.columns.str.strip().str.lower()
+        # Rimuove duplicati per evitare errori .str
+        df = df.loc[:, ~df.columns.duplicated()]
         
-        # Mappa Estesa per includere i Ranking
+        # Mappa Estesa (copre datameci, data, place 1a, ecc)
         rename_map = {
             '1': 'cotaa', 'x': 'cotae', '2': 'cotad',
             'eloc': 'elohomeo', 'eloo': 'eloawayo',
             'gfinc': 'scor1', 'gfino': 'scor2',
-            'data': 'datamecic', 'casa': 'txtechipa1', 'ospite': 'txtechipa2',
-            # Nuovi campi Ranking (adatta in base al tuo file se diverso)
+            'data': 'datamecic', 'datameci': 'datamecic',
+            'casa': 'txtechipa1', 'ospite': 'txtechipa2',
             'place 1a': 'rank_h_home', 'place 2d': 'rank_a_away',
             'place 1t': 'rank_h_tot', 'place 2t': 'rank_a_tot'
         }
-        # Cerca di mappare anche varianti (es. "Place 1a" -> "rank_h_home")
+        
+        # Mappa fuzzy: se la colonna contiene "place 1a", la rinomina
+        final_map = {}
         for col in df.columns:
-            if "place" in col and "1a" in col: rename_map[col] = 'rank_h_home'
-            if "place" in col and "2d" in col: rename_map[col] = 'rank_a_away'
-            
-        df = df.rename(columns=rename_map)
+            for k, v in rename_map.items():
+                if k in col and col not in final_map:
+                    final_map[col] = v
+                    break
+        df = df.rename(columns=final_map)
         
         # Pulizia Numeri
         cols_num = ['cotaa', 'cotae', 'cotad', 'elohomeo', 'eloawayo', 'scor1', 'scor2', 'rank_h_home', 'rank_a_away']
@@ -132,7 +133,7 @@ def load_data(file, base_hfa, use_dynamic):
 # --- INTERFACCIA ---
 st.sidebar.header("⚙️ Impostazioni Modello")
 BASE_HFA = st.sidebar.number_input("HFA Base", value=100, step=10)
-USE_DYN = st.sidebar.checkbox("Usa HFA Dinamico (Classifica)", value=True, help="Se attivo, modifica l'HFA in base alla forza Casa/Trasferta delle squadre.")
+USE_DYN = st.sidebar.checkbox("Usa HFA Dinamico (Classifica)", value=True, help="Modifica l'HFA in base alla classifica Casa/Trasferta.")
 
 uploaded_file = st.sidebar.file_uploader("📂 Carica CSV (con Ranking)", type=["csv"])
 
@@ -144,12 +145,11 @@ if uploaded_file:
     else:
         st.success(f"Dati caricati! ({len(df)} righe)")
         
-        # Check se abbiamo i dati ranking
         has_rank = 'rank_h_home' in df.columns and 'rank_a_away' in df.columns
         if USE_DYN and not has_rank:
-            st.warning("⚠️ Attenzione: Non ho trovato le colonne 'Place 1a' e 'Place 2d' nel file. L'HFA Dinamico non può essere applicato (uso quello Base).")
+            st.warning("⚠️ Colonne Ranking non trovate. Uso HFA Base.")
 
-        tab1, tab2 = st.tabs(["📊 Analisi Profitto (ROI)", "🔍 Dettaglio HFA"])
+        tab1, tab2 = st.tabs(["📊 Analisi Profitto", "🔍 Dettaglio HFA"])
         
         with tab1:
             st.header("Confronto Redditività")
@@ -160,18 +160,28 @@ if uploaded_file:
                 pnl_2 = np.where(df_played['EV_2']>0, np.where(df_played['res_1x2']=='2', df_played['cotad']-1, -1), 0).sum()
                 
                 k1, k2 = st.columns(2)
-                k1.metric("Profitto Casa (1)", f"{pnl_1:.2f} u", delta="Con HFA Dinamico" if USE_DYN else "Standard")
-                k2.metric("Profitto Ospite (2)", f"{pnl_2:.2f} u", delta="Con HFA Dinamico" if USE_DYN else "Standard")
+                k1.metric("Profitto Casa (1)", f"{pnl_1:.2f} u", delta="Dinamico" if USE_DYN else "Standard")
+                k2.metric("Profitto Ospite (2)", f"{pnl_2:.2f} u", delta="Dinamico" if USE_DYN else "Standard")
                 
-                st.dataframe(df_played[['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'cotaa', 'cotad', 'EV_1', 'EV_2']])
+                # --- VISUALIZZAZIONE SICURA (NO CRASH) ---
+                # Cerco le colonne che esistono davvero nel file
+                possible_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'cotaa', 'cotad', 'EV_1', 'EV_2', 'res_1x2']
+                final_cols = [c for c in possible_cols if c in df_played.columns]
+                
+                st.dataframe(df_played[final_cols])
             else:
-                st.info("Nessun risultato storico nel file (solo partite future).")
-                st.dataframe(df[['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'EV_1', 'EV_2']])
+                st.info("Nessun risultato storico nel file.")
+                # Mostra colonne sicure anche per future
+                possible_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'EV_1', 'EV_2']
+                final_cols = [c for c in possible_cols if c in df.columns]
+                st.dataframe(df[final_cols])
 
         with tab2:
-            st.header("Come cambia il Fattore Campo?")
+            st.header("Impatto Classifica su HFA")
             if has_rank:
-                st.write("Ecco come il Ranking influenza il vantaggio casa:")
-                st.dataframe(df[['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']].head(20))
+                st.write("Esempio di come il Ranking modifica il fattore campo:")
+                cols_rank = ['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']
+                safe_cols = [c for c in cols_rank if c in df.columns]
+                st.dataframe(df[safe_cols].head(20))
             else:
-                st.write("Dati ranking non disponibili.")
+                st.write("Dati ranking non disponibili nel file.")
