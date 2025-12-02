@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Value Bet Dynamic v49", page_icon="📈", layout="wide")
-st.title("📈 Calcolatore Strategico (Dynamic HFA v49)")
+st.set_page_config(page_title="Value Bet Stable v51", page_icon="🛡️", layout="wide")
+st.title("🛡️ Calcolatore Strategico (Stable Fix v51)")
 st.markdown("---")
 
 # --- FUNZIONI MATEMATICHE ---
@@ -41,7 +41,6 @@ def calculate_row(row, base_hfa, use_dynamic):
             r_a_away = row.get('rank_a_away') # Place 2d
             
             if pd.notna(r_h_home) and pd.notna(r_a_away):
-                # Moltiplicatore: 3 punti ELO per ogni posizione di differenza
                 rank_diff = r_a_away - r_h_home
                 adj = rank_diff * 3
                 current_hfa = base_hfa + adj
@@ -83,23 +82,27 @@ def load_data(file, base_hfa, use_dynamic):
 
         df.columns = df.columns.str.strip().str.lower()
         
-        # Mappa Estesa e Corretta
+        # Mappa Base
         rename_map = {
             '1': 'cotaa', 'x': 'cotae', '2': 'cotad',
             'eloc': 'elohomeo', 'eloo': 'eloawayo',
             'gfinc': 'scor1', 'gfino': 'scor2',
-            'data': 'datamecic', 'datameci': 'datamecic', # Aggiunto datameci
+            'data': 'datamecic', 'datameci': 'datamecic',
             'casa': 'txtechipa1', 'ospite': 'txtechipa2',
             # Ranking
             'place 1a': 'rank_h_home', 'place 2d': 'rank_a_away',
             'place 1t': 'rank_h_tot', 'place 2t': 'rank_a_tot'
         }
         
-        # Ricerca colonne parziali (es. "Place 1a " con spazi)
+        # --- FIX DIZIONARIO (Iterazione Sicura) ---
+        extra_map = {}
         for col in df.columns:
             for key in rename_map:
-                if key in col: 
-                    rename_map[col] = rename_map[key]
+                if key in col and col not in rename_map: 
+                    extra_map[col] = rename_map[key]
+        
+        # Aggiorno la mappa principale con le nuove scoperte FUORI dal ciclo
+        rename_map.update(extra_map)
         
         df = df.rename(columns=rename_map)
         
@@ -161,9 +164,8 @@ if uploaded_file:
                 k1.metric("Profitto Casa (1)", f"{pnl_1:.2f} u", delta="Dinamico" if USE_DYN else "Standard")
                 k2.metric("Profitto Ospite (2)", f"{pnl_2:.2f} u", delta="Dinamico" if USE_DYN else "Standard")
                 
-                # --- FIX CRASH: Selezione sicura delle colonne ---
+                # Selezione sicura colonne
                 desired_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'cotaa', 'cotad', 'EV_1', 'EV_2', 'res_1x2']
-                # Prendo solo quelle che esistono nel dataframe
                 final_cols = [c for c in desired_cols if c in df_played.columns]
                 
                 st.dataframe(df_played[final_cols])
