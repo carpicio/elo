@@ -45,6 +45,7 @@ def calculate_row(row, base_hfa, use_dynamic):
                 adj = rank_diff * 3
                 # --- CARICAMENTO DATI ---
 # --- CARICAMENTO DATI ---
+# --- CARICAMENTO DATI ---
 @st.cache_data(ttl=0)
 def load_data(file, base_hfa, use_dynamic):
     try:
@@ -113,6 +114,8 @@ def load_data(file, base_hfa, use_dynamic):
             df.loc[mask & (df['scor1'] < df['scor2']), 'res_1x2'] = '2'
             
         return df, None
+    except Exception as e:
+        return None, f"Errore nel caricamento: {str(e)}"
     except Exception as e:
         return None, f"Errore nel caricamento: {str(e)}"
     except Exception as e:
