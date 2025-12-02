@@ -154,4 +154,56 @@ if uploaded_file:
         
         # Verifica presenza colonne Ranking
         has_rank = 'rank_h_home' in df.columns and 'rank_a_away' in df.columns
-        if USE_
+        if USE_DYN and not has_rank:
+            st.warning("⚠️ Colonne 'Place 1a' e 'Place 2d' non trovate nel file. Il calcolo userà solo HFA Base.")
+
+        # CREAZIONE TABS
+        tab1, tab2 = st.tabs(["📊 Analisi Profitto", "🔍 Dati & Ranking"])
+        
+        # --- TAB 1: ANALISI ---
+        with tab1:
+            st.subheader("Confronto Redditività")
+            df_played = df[df['res_1x2'] != '-'].copy()
+            
+            if not df_played.empty:
+                # Calcolo PnL
+                pnl_1 = np.where(df_played['EV_1']>0, np.where(df_played['res_1x2']=='1', df_played['cotaa']-1, -1), 0).sum()
+                pnl_2 = np.where(df_played['EV_2']>0, np.where(df_played['res_1x2']=='2', df_played['cotad']-1, -1), 0).sum()
+                
+                k1, k2 = st.columns(2)
+                k1.metric("Profitto Casa (1)", f"{pnl_1:.2f} u")
+                k2.metric("Profitto Ospite (2)", f"{pnl_2:.2f} u")
+                
+                # Tabella Risultati
+                desired_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'cotaa', 'cotad', 'EV_1', 'EV_2', 'res_1x2']
+                # Filtra solo colonne che esistono davvero
+                final_cols = [c for c in desired_cols if c in df_played.columns]
+                
+                # Rimuovi duplicati dalla lista visualizzazione
+                final_cols = list(dict.fromkeys(final_cols))
+                st.dataframe(df_played[final_cols])
+            else:
+                st.info("Nessuna partita con risultato finale trovato nel file.")
+
+        # --- TAB 2: DATI COMPLETI ---
+        with tab2:
+            st.subheader("Dataset Completo")
+            
+            # Mostra tutto il dataframe (gestendo colonne duplicate se rimaste)
+            st.dataframe(df.loc[:, ~df.columns.duplicated()])
+            
+            st.markdown("---")
+            st.subheader("Check Colonne Ranking")
+            
+            # Tentativo di mostrare le colonne specifiche del ranking
+            cols_rank = ['txtechipa1', 'rank_h_home', 'txtechipa2', 'rank_a_away', 'HFA_Used']
+            # Filtro di sicurezza: prendo solo quelle che ESISTONO nel file
+            safe_cols = [c for c in cols_rank if c in df.columns]
+            
+            if len(safe_cols) > 0:
+                st.dataframe(df[safe_cols].head(20))
+            else:
+                st.warning("Le colonne del ranking (Place 1a, Place 2d) non sono state trovate.")
+
+else:
+    st.info("👈 Carica un file CSV dalla barra laterale per iniziare.")
