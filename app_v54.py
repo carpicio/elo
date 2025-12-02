@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # --- CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Value Bet V56", page_icon="🛡️", layout="wide")
-st.title("🛡️ Calcolatore Strategico (Final V56)")
+st.set_page_config(page_title="Value Bet V57", page_icon="🛡️", layout="wide")
+st.title("🛡️ Calcolatore Strategico (V57 - Short Lines)")
 st.markdown("---")
 
 # --- FUNZIONI MATEMATICHE ---
@@ -82,23 +82,40 @@ def load_data(file, base_hfa, use_dynamic):
     try:
         # Tenta lettura con ; poi con ,
         try:
-            df = pd.read_csv(file, sep=';', encoding='latin1', on_bad_lines='skip', engine='python')
+            df = pd.read_csv(
+                file, 
+                sep=';', 
+                encoding='latin1', 
+                on_bad_lines='skip', 
+                engine='python'
+            )
             if len(df.columns) < 3: raise ValueError
         except:
             file.seek(0)
-            df = pd.read_csv(file, sep=',', encoding='latin1', on_bad_lines='skip', engine='python')
+            df = pd.read_csv(
+                file, 
+                sep=',', 
+                encoding='latin1', 
+                on_bad_lines='skip', 
+                engine='python'
+            )
 
         df.columns = df.columns.str.strip().str.lower()
         df = df.loc[:, ~df.columns.duplicated()] 
         
-        # MAPPING ESTESO
+        # MAPPING ESTESO (Formattato verticale per sicurezza)
         rename_map = {
-            '1': 'cotaa', 'x': 'cotae', '2': 'cotad',
-            'eloc': 'elohomeo', 'eloo': 'eloawayo',
-            'gfinc': 'scor1', 'gfino': 'scor2',
-            'data': 'datamecic', 'datameci': 'datamecic',
-            'casa': 'txtechipa1', 'ospite': 'txtechipa2',
-            # Rank varianti
+            '1': 'cotaa', 
+            'x': 'cotae', 
+            '2': 'cotad',
+            'eloc': 'elohomeo', 
+            'eloo': 'eloawayo',
+            'gfinc': 'scor1', 
+            'gfino': 'scor2',
+            'data': 'datamecic', 
+            'datameci': 'datamecic',
+            'casa': 'txtechipa1', 
+            'ospite': 'txtechipa2',
             'place1a': 'rank_h_home',
             'place 1a': 'rank_h_home',
             'place2d': 'rank_a_away',
@@ -121,7 +138,13 @@ def load_data(file, base_hfa, use_dynamic):
         df = df.loc[:, ~df.columns.duplicated()]
 
         # Pulizia numeri
-        cols_num = ['cotaa', 'cotae', 'cotad', 'elohomeo', 'eloawayo', 'scor1', 'scor2', 'rank_h_home', 'rank_a_away']
+        cols_num = [
+            'cotaa', 'cotae', 'cotad', 
+            'elohomeo', 'eloawayo', 
+            'scor1', 'scor2', 
+            'rank_h_home', 'rank_a_away'
+        ]
+        
         for c in cols_num:
             if c in df.columns:
                 df[c] = df[c].astype(str).str.replace(',', '.', regex=False)
@@ -163,7 +186,7 @@ if uploaded_file:
         
         has_rank = 'rank_h_home' in df.columns and 'rank_a_away' in df.columns
         if USE_DYN and not has_rank:
-            st.warning("⚠️ Ranking non trovato (Place1a/Place2d). Uso HFA standard.")
+            st.warning("⚠️ Ranking non trovato. Uso HFA standard.")
         elif USE_DYN:
             st.info("✅ Ranking attivo.")
 
@@ -172,14 +195,24 @@ if uploaded_file:
         with tab1:
             df_played = df[df['res_1x2'] != '-'].copy()
             if not df_played.empty:
-                pnl_1 = np.where(df_played['EV_1']>0, np.where(df_played['res_1x2']=='1', df_played['cotaa']-1, -1), 0).sum()
-                pnl_2 = np.where(df_played['EV_2']>0, np.where(df_played['res_1x2']=='2', df_played['cotad']-1, -1), 0).sum()
+                # Calcolo PNL
+                pnl_1 = np.where(
+                    df_played['EV_1']>0, 
+                    np.where(df_played['res_1x2']=='1', df_played['cotaa']-1, -1), 
+                    0
+                ).sum()
+                
+                pnl_2 = np.where(
+                    df_played['EV_2']>0, 
+                    np.where(df_played['res_1x2']=='2', df_played['cotad']-1, -1), 
+                    0
+                ).sum()
                 
                 c1, c2 = st.columns(2)
                 c1.metric("Profitto Casa", f"{pnl_1:.2f} u")
                 c2.metric("Profitto Ospite", f"{pnl_2:.2f} u")
                 
-                # LISTA COLONNE BLINDATA (Verticale per evitare errori copia)
+                # LISTA COLONNE CORTA E SICURA
                 cols_show = [
                     'datamecic',
                     'txtechipa1',
@@ -196,11 +229,11 @@ if uploaded_file:
                 final_cols = [c for c in cols_show if c in df_played.columns]
                 st.dataframe(df_played[final_cols])
             else:
-                st.info("Nessun risultato finale disponibile per il calcolo profitto.")
+                st.info("Nessun risultato finale disponibile.")
 
         with tab2:
             st.dataframe(df)
     else:
-        st.warning("File letto ma vuoto o colonne mancanti.")
+        st.warning("File vuoto o colonne mancanti.")
 else:
     st.info("Carica il file CSV per iniziare.")
