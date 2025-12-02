@@ -180,7 +180,14 @@ if uploaded_file:
                 st.info("Nessun risultato storico nel file.")
                 desired_cols = ['datamecic', 'txtechipa1', 'txtechipa2', 'HFA_Used', 'EV_1', 'EV_2']
                 final_cols = [c for c in desired_cols if c in df.columns]
-                st.dataframe(df[final_cols])
+                # 1. Rimuove duplicati dalla LISTA delle colonne richieste
+final_cols = list(dict.fromkeys(final_cols))
+
+# 2. Rimuove eventuali colonne duplicate dal DATAFRAME stesso
+df = df.loc[:, ~df.columns.duplicated()]
+
+# 3. Mostra la tabella
+st.dataframe(df[final_cols])
 
         with tab2:
             st.header("Impatto Classifica su HFA")
