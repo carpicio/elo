@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Value Bet Dynamic v50", page_icon="📈", layout="wide")
-st.title("📈 Calcolatore Strategico (Dynamic Fix v50)")
+st.set_page_config(page_title="Value Bet Dynamic v49", page_icon="📈", layout="wide")
+st.title("📈 Calcolatore Strategico (Dynamic HFA v49)")
 st.markdown("---")
 
 # --- FUNZIONI MATEMATICHE ---
