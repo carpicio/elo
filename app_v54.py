@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import io
 
 # --- CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Value Bet V57", page_icon="🛡️", layout="wide")
-st.title("🛡️ Calcolatore Strategico (V57 - Short Lines)")
+st.set_page_config(page_title="Value Bet V58", page_icon="🛡️", layout="wide")
+st.title("🛡️ Calcolatore Strategico (V58 - Auto Detect)")
 st.markdown("---")
 
 # --- FUNZIONI MATEMATICHE ---
@@ -29,7 +30,7 @@ def calculate_row(row, base_hfa, use_dynamic):
     res = {'EV_1': -1, 'EV_X': -1, 'EV_2': -1, 'HFA_Used': base_hfa}
     
     try:
-        # Helper sicuro per numeri
+        # Helper per numeri
         def get_float(val):
             try:
                 return float(str(val).replace(',', '.'))
@@ -80,42 +81,40 @@ def calculate_row(row, base_hfa, use_dynamic):
 @st.cache_data(ttl=0)
 def load_data(file, base_hfa, use_dynamic):
     try:
-        # Tenta lettura con ; poi con ,
+        # 1. AUTO-DETECT DEL SEPARATORE
+        # sep=None obbliga Python a "annusare" il file per capire se usa ; o ,
         try:
             df = pd.read_csv(
                 file, 
-                sep=';', 
+                sep=None, 
                 encoding='latin1', 
                 on_bad_lines='skip', 
                 engine='python'
             )
-            if len(df.columns) < 3: raise ValueError
         except:
+            # Fallback brutale
             file.seek(0)
-            df = pd.read_csv(
-                file, 
-                sep=',', 
-                encoding='latin1', 
-                on_bad_lines='skip', 
-                engine='python'
-            )
+            df = pd.read_csv(file, sep=';', encoding='latin1', engine='python')
 
+        # Normalizzazione nomi
         df.columns = df.columns.str.strip().str.lower()
         df = df.loc[:, ~df.columns.duplicated()] 
         
-        # MAPPING ESTESO (Formattato verticale per sicurezza)
+        # MAPPING ESTESO E RIDONDANTE
+        # Mappiamo anche i nomi corretti su se stessi per sicurezza
         rename_map = {
-            '1': 'cotaa', 
-            'x': 'cotae', 
-            '2': 'cotad',
-            'eloc': 'elohomeo', 
-            'eloo': 'eloawayo',
-            'gfinc': 'scor1', 
-            'gfino': 'scor2',
-            'data': 'datamecic', 
-            'datameci': 'datamecic',
-            'casa': 'txtechipa1', 
-            'ospite': 'txtechipa2',
+            '1': 'cotaa', 'cotaa': 'cotaa', 'quota1': 'cotaa',
+            'x': 'cotae', 'cotae': 'cotae', 'quotax': 'cotae',
+            '2': 'cotad', 'cotad': 'cotad', 'quota2': 'cotad',
+            'eloc': 'elohomeo', 'elohomeo': 'elohomeo',
+            'eloo': 'eloawayo', 'eloawayo': 'eloawayo',
+            'gfinc': 'scor1', 'scor1': 'scor1',
+            'gfino': 'scor2', 'scor2': 'scor2',
+            'data': 'datamecic', 'datameci': 'datamecic', 'date': 'datamecic',
+            'casa': 'txtechipa1', 'home': 'txtechipa1',
+            'ospite': 'txtechipa2', 'away': 'txtechipa2',
+            
+            # Ranking
             'place1a': 'rank_h_home',
             'place 1a': 'rank_h_home',
             'place2d': 'rank_a_away',
@@ -150,14 +149,21 @@ def load_data(file, base_hfa, use_dynamic):
                 df[c] = df[c].astype(str).str.replace(',', '.', regex=False)
                 df[c] = pd.to_numeric(df[c], errors='coerce')
 
-        df = df.dropna(subset=['cotaa', 'cotae', 'cotad', 'elohomeo', 'eloawayo'])
+        # CONTROLLO VALIDITA
+        required = ['cotaa', 'cotae', 'cotad', 'elohomeo', 'eloawayo']
+        missing = [c for c in required if c not in df.columns]
+        
+        if missing:
+            return df, f"Colonne mancanti: {missing}"
+            
+        df = df.dropna(subset=required)
         
         # Calcolo
         if not df.empty:
             calc = df.apply(lambda r: calculate_row(r, base_hfa, use_dynamic), axis=1)
             df = pd.concat([df, calc], axis=1)
         
-            # Determina Risultato 1X2
+            # Risultato 1X2
             df['res_1x2'] = '-' 
             if 'scor1' in df.columns and 'scor2' in df.columns:
                 mask = df['scor1'].notna() & df['scor2'].notna()
@@ -179,8 +185,16 @@ uploaded_file = st.sidebar.file_uploader("📂 Carica CSV", type=["csv"])
 if uploaded_file:
     df, error_msg = load_data(uploaded_file, BASE_HFA, USE_DYN)
     
+    # SEZIONE DEBUG (Se qualcosa non va, qui vediamo perché)
     if error_msg:
+        st.error("⚠️ ERRORE LETTURA FILE")
         st.error(error_msg)
+        if df is not None:
+            st.write("👀 ECCO LE COLONNE CHE HO LETTO (Controlla se sono giuste):")
+            st.write(list(df.columns))
+            st.write("🔍 Primi 3 righi del file grezzo:")
+            st.dataframe(df.head(3))
+            
     elif df is not None and not df.empty:
         st.success(f"Dati caricati: {len(df)} partite")
         
@@ -195,7 +209,7 @@ if uploaded_file:
         with tab1:
             df_played = df[df['res_1x2'] != '-'].copy()
             if not df_played.empty:
-                # Calcolo PNL
+                # PNL
                 pnl_1 = np.where(
                     df_played['EV_1']>0, 
                     np.where(df_played['res_1x2']=='1', df_played['cotaa']-1, -1), 
@@ -212,20 +226,14 @@ if uploaded_file:
                 c1.metric("Profitto Casa", f"{pnl_1:.2f} u")
                 c2.metric("Profitto Ospite", f"{pnl_2:.2f} u")
                 
-                # LISTA COLONNE CORTA E SICURA
                 cols_show = [
                     'datamecic',
-                    'txtechipa1',
-                    'txtechipa2',
+                    'txtechipa1', 'txtechipa2',
                     'HFA_Used',
-                    'cotaa',
-                    'cotad',
-                    'EV_1',
-                    'EV_2',
+                    'cotaa', 'cotad',
+                    'EV_1', 'EV_2',
                     'res_1x2'
                 ]
-                
-                # Filtra solo colonne esistenti
                 final_cols = [c for c in cols_show if c in df_played.columns]
                 st.dataframe(df_played[final_cols])
             else:
@@ -234,6 +242,6 @@ if uploaded_file:
         with tab2:
             st.dataframe(df)
     else:
-        st.warning("File vuoto o colonne mancanti.")
+        st.warning("File vuoto.")
 else:
     st.info("Carica il file CSV per iniziare.")
